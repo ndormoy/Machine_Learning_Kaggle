@@ -292,7 +292,7 @@ The **axis** parameter in apply() can take two possible values:
 - ***axis=1*** or ***axis='columns'***: Apply the function to each row (operate on columns).
 
 
-### d) **idxmax()**
+#### d) **idxmax()**
 
 Is used to find the index (row label) of the first occurrence of the ***maximum value*** in a Series or DataFrame.  
 It returns the label (index) of the row where the maximum value occurs.
@@ -312,7 +312,7 @@ print("Index of maximum value for each column:")
 print(max_index)
 ```
 
-### e) **.loc**
+#### e) **.loc**
 
 ***.loc*** is a label-based indexing method that is used to access rows and columns in a DataFrame by their labels (row and column names).  
 It allows you to select data based on the row and column labels, rather than using numerical index positions (which is done with .iloc).
@@ -325,3 +325,237 @@ df.loc[row_label, column_label]
 - df: The pandas DataFrame you want to access data from.
 - row_label: The label (name) of the row you want to access.
 - column_label: The label (name) of the column you want to access.
+
+## IV) **Grouping and sorting**
+
+### 1) **Groupwise analysis**
+
+- **groupby** : df.groupby('columnname').method() --> return a ***groupby object*** that can be used to group together rows based off of a column and then apply a function to each group separately. 
+We can use multiple functions on a groupby :
+- groupby().size
+- groupby().count
+- groupby().min
+- groupby().max
+- [...]
+
+For an example, here's how we would pick out the best wine by country and province:
+```
+reviews.groupby(['country', 'province']).apply(lambda df: df.loc[df.points.idxmax()])
+```
+
+- **agg** : df.groupby('columnname').agg() --> return a ***dataframe*** , which lets you run a bunch of different functions on your DataFrame simultaneously.
+
+For example, we can generate a simple statistical summary of the dataset as follows:
+```
+reviews.groupby(['country']).price.agg([len, min, max])
+```
+
+| country   | len | min | max   |
+|-----------|-----|-----|-------|
+| Argentina | 3800 | 4.0 | 230.0 |
+| Armenia   | 2   | 14.0 | 15.0  |
+| ...       | ... | ... | ...   |
+| Ukraine   | 14  | 6.0 | 13.0  |
+| Uruguay   | 109 | 10.0 | 130.0 |
+
+### 2) **Multi-indexes**
+
+Instead of having a single row index (like a standard DataFrame), a ***multi-index*** DataFrame has two or more levels of row indices, allowing you to store and access data in a hierarchical structure.
+
+- A multi-index allows you to efficiently organize and manage complex datasets with multiple dimensions or categories.
+- It enables you to perform ***advanced indexing*** and slicing operations along each level of the index, making data retrieval more flexible.
+- It is particularly useful when dealing with panel data, time series, or any data with ***hierarchical relationships***.
+
+for example with this we have multi-indexes:
+```
+countries_reviewed = reviews.groupby(['country', 'province']).description.agg([len])
+```
+
+However, in general the multi-index method you will use most often is the one for converting back to a regular index, the ***reset_index()*** method:
+```
+countries_reviewed.reset_index()
+```
+
+### 3) **Sorting**
+
+Looking again at countries_reviewed we can see that grouping returns data in index order, not in value order. That is to say, when outputting the result of a groupby, the order of the rows is dependent on the values in the index, not in the data.
+
+To get data in the order want it in we can sort it ourselves. The ***sort_values()*** method is handy for this.
+
+```
+countries_reviewed = countries_reviewed.reset_index()
+countries_reviewed.sort_values(by='len')
+```
+
+| country | province        | len |
+|--------|-----------------|-----|
+| Greece | Muscat of Kefallonian | 1 |
+| Greece | Sterea Ellada        | 1 |
+| ...    | ...                 | ... |
+| US     | Washington          | 8639 |
+| US     | California          | 36247 |
+
+- sort_values() defaults to an ascending sort, where the lowest values go first.  
+However, most of the time we want a descending sort, where the higher numbers go first. That goes thusly:
+
+```
+countries_reviewed.sort_values(by='len', ascending=False)
+```
+
+Finally, know that you can sort by more than one column at a time:
+```
+countries_reviewed.sort_values(by=['country', 'len'])
+```
+
+Parameters:
+
+- by: This parameter specifies the column(s) based on which the sorting should be performed. It can be a column name (string or list of strings) or a list of column names if you want to sort by multiple columns.
+- axis: The axis along which the sorting should be performed. It can take two possible values:
+- axis=0 (default): Sorts the rows based on the values in the specified column(s).
+- axis=1: Sorts the columns based on the values in the specified row(s).
+- ascending:  If True (default), the data is sorted in ascending order. If False, the data is sorted in - descending order.
+- inplace: By default, it is False, which means the function returns a new DataFrame. If you set it to True, the sorting is done in place, and the original DataFrame is modified.
+- ignore_index: A boolean value that determines whether to reset the index of the sorted DataFrame. By default, it is False, which means the index of the original DataFrame is preserved in the sorted DataFrame. If you set it to True, a new default integer index is assigned to the sorted DataFrame.
+
+example:
+What is the best wine I can buy for a given amount of money?  
+Create a Series whose index is wine prices and whose values is the maximum number of points a wine costing that much was given in a review.  
+Sort the values by price, ascending (so that 4.0 dollars is at the top and 3300.0 dollars is at the bottom).
+
+```
+best_rating_per_price = reviews.groupby("price")["points"].max().sort_index()
+```
+
+In this code, we first group the DataFrame reviews by the "price" column using groupby("price"). Then, we select the "points" column by specifying ["points"] after the groupby operation.  
+Finally, we apply the max() function to the "points" column to get the maximum points for each price level, and the result is sorted based on the "price" values using sort_index().  
+This will give you the desired output, which is the maximum points for each unique price level.
+
+Other example :
+What are the minimum and maximum prices for each variety of wine? Create a DataFrame whose index is the variety category from the dataset and whose values are the min and max values thereof.
+
+```
+price_extremes = reviews.groupby("variety")["price"].agg([min, max])
+```
+
+
+#### **To summarize:**
+
+**groupby() multi-index**
+```
+df.groupby("columname")["othercolumn"].method()
+```
+**groupby()**
+```
+df.groupby(["columnname", "othercolumnname"]).othercolumn.method()
+```
+
+## V) **Data types and missing values**
+
+### 1) **Dtypes**
+
+The data type for a column in a DataFrame or a Series is known as the dtype.
+
+```
+reviews.price.dtype
+```
+
+Alternatively, the dtypes property returns the dtype of every column in the DataFrame:
+```
+reviews.dtypes
+```
+
+#### convert type
+
+```
+reviews.points.astype('float64')
+```
+
+### 2) **Missing data**
+
+- NaN values are always of the float64 dtype.
+- To select NaN entries you can use pd.isnull() (or its companion pd.notnull())
+
+example :
+```
+reviews[pd.isnull(reviews.country)]
+```
+
+#### a) **Replacing missing values**
+
+**fillna()**
+
+For example, we can simply replace each NaN with an "Unknown":
+
+```
+reviews.region_2.fillna("Unknown")
+```
+
+#### b) **Replacing existing values**
+
+**replace()**
+
+For example, suppose that since this dataset was published, reviewer Kerin O'Keefe has changed her Twitter handle from @kerinokeefe to @kerino
+
+```
+reviews.taster_twitter_handle.replace("@kerinokeefe", "@kerino")
+```
+
+## VI) **Renaming and combining**
+
+### 1) **Renaming**
+
+**rename()**
+which lets you change index names and/or column names.  
+For example, to change the points column in our dataset to score, we would do:
+
+```
+reviews.rename(columns={'points': 'score'})
+```
+
+- rename() lets you rename index or column values by specifying a index or column keyword parameter, respectively.  
+- It supports a variety of input formats, but usually a Python dictionary is the most convenient.
+
+Here is an example using it to rename some elements of the index.
+```
+reviews.rename(index={0: 'firstEntry', 1: 'secondEntry'})
+```
+You'll probably rename columns very often, but rename index values very rarely. For that, ***set_index()*** is usually more convenient.
+
+Both the row index and the column index can have their own name attribute. The complimentary ***rename_axis()*** method may be used to change these names. For example:
+```
+reviews.rename_axis("wines", axis='rows').rename_axis("fields", axis='columns')
+```
+
+### 2) **Combining**
+
+When performing operations on a dataset, we will sometimes need to combine different DataFrames and/or Series in non-trivial ways.  
+Pandas has three core methods for doing this.  
+In order of increasing complexity, these are ***concat(), join(), and merge()***
+
+#### a) **concat()**
+
+The simplest combining method is ***concat()***.  
+Given a list of elements, this function will smush those elements together along an axis.
+
+If we want to study multiple countries simultaneously, we can use concat() to smush them together:
+```
+canadian_youtube = pd.read_csv("../input/youtube-new/CAvideos.csv")
+british_youtube = pd.read_csv("../input/youtube-new/GBvideos.csv")
+pd.concat([canadian_youtube, british_youtube])
+```
+
+#### b) **join()**
+
+Lets you combine different DataFrame objects which have an index in common.
+
+For example, to pull down videos that happened to be trending on the same day in both Canada and the UK, we could do the following:
+
+```
+left = canadian_youtube.set_index(['title', 'trending_date'])
+right = british_youtube.set_index(['title', 'trending_date'])
+
+left.join(right, lsuffix='_CAN', rsuffix='_UK')
+```
+
+The ***lsuffix*** and ***rsuffix*** parameters are necessary here because the data has the same column names in both British and Canadian datasets.  
+If this wasn't true (because, say, we'd renamed them beforehand) we wouldn't need them.
